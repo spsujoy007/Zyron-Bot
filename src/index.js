@@ -337,6 +337,61 @@ bot.command('summary', async (ctx) => {
   ctx.reply(summary, { parse_mode: 'Markdown' });
 });
 
+bot.on('inline_query', async (ctx) => {
+  const query = ctx.inlineQuery.query.trim();
+  const userId = ctx.from.id;
+
+  if (!query) {
+    return ctx.answerInlineQuery([], {
+      cache_time: 0,
+      switch_pm_text: 'Type something to search your notes & ideas',
+      switch_pm_parameter: 'inline_help',
+    });
+  }
+
+  const regex = new RegExp(query, 'i');
+  const notes = await Note.find({ userId, content: regex }).limit(5);
+  const ideas = await Idea.find({ userId, content: regex }).limit(5);
+
+  const results = [];
+
+  notes.forEach((n, i) => {
+    results.push({
+      type: 'article',
+      id: `note_${n._id}`,
+      title: `📝 ${n.content.substring(0, 50)}`,
+      description: n.content.substring(0, 100),
+      input_message_content: {
+        message_text: `📝 **Note:**\n${n.content}`,
+        parse_mode: 'Markdown',
+      },
+    });
+  });
+
+  ideas.forEach((n, i) => {
+    results.push({
+      type: 'article',
+      id: `idea_${n._id}`,
+      title: `💡 ${n.content.substring(0, 50)}`,
+      description: n.content.substring(0, 100),
+      input_message_content: {
+        message_text: `💡 **Idea:**\n${n.content}`,
+        parse_mode: 'Markdown',
+      },
+    });
+  });
+
+  if (!results.length) {
+    return ctx.answerInlineQuery([], {
+      cache_time: 0,
+      switch_pm_text: `No results for "${query}"`,
+      switch_pm_parameter: 'inline_no_results',
+    });
+  }
+
+  ctx.answerInlineQuery(results, { cache_time: 0 });
+});
+
 setInterval(async () => {
   const now = new Date();
   const due = await Reminder.find({ completed: false, remindAt: { $lte: now } });
