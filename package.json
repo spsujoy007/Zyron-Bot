@@ -1,0 +1,15 @@
+{
+  "name": "daily-life-bot",
+  "version": "1.0.0",
+  "description": "Telegram bot for daily life management",
+  "main": "src/index.js",
+  "scripts": {
+    "start": "node src/index.js",
+    "dev": "node --watch src/index.js"
+  },
+  "dependencies": {
+    "grammy": "^1.21.1",
+    "mongoose": "^8.4.0",
+    "dotenv": "^16.4.5"
+  }
+}
