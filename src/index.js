@@ -1,3 +1,4 @@
+const http = require('http');
 const { Bot, InlineKeyboard } = require('grammy');
 require('dotenv').config();
 const connectDB = require('./config/db');
@@ -8,8 +9,6 @@ const Task = require('./models/Task');
 const Mood = require('./models/Mood');
 
 const bot = new Bot(process.env.BOT_TOKEN);
-
-connectDB();
 
 const startMenu = new InlineKeyboard()
   .text('📝 Save Note', 'menu_note')
@@ -349,15 +348,29 @@ setInterval(async () => {
   }
 }, 30000);
 
-const http = require('http');
+bot.catch((err) => console.error('Bot error:', err));
+
 const server = http.createServer((req, res) => {
   res.writeHead(200);
   res.end('Bot is running');
 });
-const PORT = process.env.PORT || 3000;
-server.listen(PORT, () => console.log(`🌐 Server listening on port ${PORT}`));
 
-bot.catch((err) => console.error('Bot error:', err));
+async function main() {
+  await connectDB();
+  const PORT = process.env.PORT || 3000;
+  server.listen(PORT, () => console.log(`🌐 Server listening on port ${PORT}`));
+  bot.start();
+  console.log('🤖 Bot is running...');
+}
 
-bot.start();
-console.log('🤖 Bot is running...');
+main().catch((err) => {
+  console.error('Failed to start:', err);
+  process.exit(1);
+});
+
+process.on('SIGTERM', () => {
+  console.log('SIGTERM received, shutting down...');
+  bot.stop();
+  server.close();
+  process.exit(0);
+});
