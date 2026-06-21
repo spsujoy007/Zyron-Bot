@@ -84,6 +84,8 @@ const helpMenu = new InlineKeyboard()
   .text('📊 Summary', 'help_summary')
   .row()
   .text('🔎 Search', 'help_search')
+  .text('👨‍💻 Creator', 'help_creator')
+  .row()
   .text('🏠 Main Menu', 'menu_main');
 
 bot.command('help', (ctx) => {
@@ -169,6 +171,31 @@ bot.callbackQuery('help_search', (ctx) => {
   ctx.reply(
     `🔎 **Search Command:**\n\n` +
     `/search <keyword> — Search through notes & ideas`,
+    { parse_mode: 'Markdown', reply_markup: helpMenu }
+  );
+});
+
+bot.callbackQuery('help_creator', (ctx) => {
+  ctx.answerCallbackQuery();
+  ctx.reply(
+    `👨‍💻 **Creator Info**\n\n` +
+    `Built with ❤️ by\n` +
+    `**Sujoy**\n\n` +
+    `🔗 [GitHub](https://github.com/spsujoy007)\n` +
+    `📦 [Source Code](https://github.com/spsujoy007/Telegram-BOT)\n\n` +
+    `Feel free to check out my other projects!`,
+    { parse_mode: 'Markdown', reply_markup: helpMenu }
+  );
+});
+
+bot.command('creatorinfo', (ctx) => {
+  ctx.reply(
+    `👨‍💻 **Creator Info**\n\n` +
+    `Built with ❤️ by\n` +
+    `**Sujoy**\n\n` +
+    `🔗 [GitHub](https://github.com/spsujoy007)\n` +
+    `📦 [Source Code](https://github.com/spsujoy007/Telegram-BOT)\n\n` +
+    `Feel free to check out my other projects!`,
     { parse_mode: 'Markdown', reply_markup: helpMenu }
   );
 });
@@ -321,6 +348,14 @@ setInterval(async () => {
     } catch (e) { }
   }
 }, 30000);
+
+const http = require('http');
+const server = http.createServer((req, res) => {
+  res.writeHead(200);
+  res.end('Bot is running');
+});
+const PORT = process.env.PORT || 3000;
+server.listen(PORT, () => console.log(`🌐 Server listening on port ${PORT}`));
 
 bot.catch((err) => console.error('Bot error:', err));
 
