@@ -1,6 +1,7 @@
 const http = require('http');
 const { Bot, InlineKeyboard } = require('grammy');
 require('dotenv').config();
+const nodemailer = require('nodemailer');
 const connectDB = require('./config/db');
 const Note = require('./models/Note');
 const Idea = require('./models/Idea');
@@ -9,6 +10,16 @@ const Task = require('./models/Task');
 const Mood = require('./models/Mood');
 
 const bot = new Bot(process.env.BOT_TOKEN);
+
+const transporter = nodemailer.createTransport({
+  service: 'gmail',
+  auth: {
+    user: process.env.EMAIL_USER,
+    pass: process.env.EMAIL_PASS,
+  },
+});
+
+const emailSessions = new Map();
 
 const startMenu = new InlineKeyboard()
   .text('📝 Save Note', 'menu_note')
@@ -20,6 +31,7 @@ const startMenu = new InlineKeyboard()
   .text('😊 Log Mood', 'menu_mood')
   .text('📊 Summary', 'menu_summary')
   .row()
+  .text('📧 Send Email', 'menu_email')
   .text('❓ Help', 'menu_help');
 
 bot.command('start', (ctx) => {
@@ -54,6 +66,12 @@ bot.callbackQuery('menu_mood', (ctx) => {
   ctx.reply('😊 Log your mood:\n\nExample: `/mood happy`', { parse_mode: 'Markdown' });
 });
 
+bot.callbackQuery('menu_email', (ctx) => {
+  ctx.answerCallbackQuery();
+  emailSessions.set(ctx.from.id, { step: 'to' });
+  ctx.reply('📧 Send an email!\n\nStep 1/3: Send me the recipient email address:');
+});
+
 bot.callbackQuery('menu_summary', async (ctx) => {
   ctx.answerCallbackQuery();
   const today = new Date();
@@ -82,9 +100,10 @@ const helpMenu = new InlineKeyboard()
   .text('😊 Mood', 'help_mood')
   .text('📊 Summary', 'help_summary')
   .row()
+  .text('📧 Email', 'help_email')
   .text('🔎 Search', 'help_search')
-  .text('👨‍💻 Creator', 'help_creator')
   .row()
+  .text('👨‍💻 Creator', 'help_creator')
   .text('🏠 Main Menu', 'menu_main');
 
 bot.command('help', (ctx) => {
@@ -151,6 +170,20 @@ bot.callbackQuery('help_mood', (ctx) => {
     `😊 **Mood Command:**\n\n` +
     `/mood <mood> — Log your mood\n\n` +
     `Moods: happy, sad, neutral, angry, excited, tired`,
+    { parse_mode: 'Markdown', reply_markup: helpMenu }
+  );
+});
+
+bot.callbackQuery('help_email', (ctx) => {
+  ctx.answerCallbackQuery();
+  ctx.reply(
+    `📧 **Email Commands:**\n\n` +
+    `/email — Send an email (3-step flow)\n\n` +
+    `Or click "📧 Send Email" from the main menu.\n\n` +
+    `Steps:\n` +
+    `1️⃣ Enter recipient email\n` +
+    `2️⃣ Enter subject\n` +
+    `3️⃣ Enter email body`,
     { parse_mode: 'Markdown', reply_markup: helpMenu }
   );
 });
@@ -294,6 +327,50 @@ bot.command('mood', async (ctx) => {
   }
   await Mood.create({ userId: ctx.from.id, mood });
   ctx.reply(`😊 Mood logged: ${mood}`);
+});
+
+bot.command('email', (ctx) => {
+  emailSessions.set(ctx.from.id, { step: 'to' });
+  ctx.reply('📧 Send an email!\n\nStep 1/3: Send me the recipient email address:');
+});
+
+bot.on('message:text', async (ctx) => {
+  const session = emailSessions.get(ctx.from.id);
+  if (!session) return;
+
+  const text = ctx.message.text;
+
+  if (session.step === 'to') {
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(text)) {
+      return ctx.reply('❌ Invalid email. Please send a valid email address:');
+    }
+    session.to = text;
+    session.step = 'subject';
+    return ctx.reply(`✅ To: ${text}\n\nStep 2/3: Send me the subject:`);
+  }
+
+  if (session.step === 'subject') {
+    session.subject = text;
+    session.step = 'body';
+    return ctx.reply(`✅ Subject: ${text}\n\nStep 3/3: Send me the email body text:`);
+  }
+
+  if (session.step === 'body') {
+    emailSessions.delete(ctx.from.id);
+    try {
+      await transporter.sendMail({
+        from: `"${ctx.from.first_name}" <${process.env.EMAIL_USER}>`,
+        to: session.to,
+        subject: session.subject,
+        text: text,
+      });
+      ctx.reply(`✅ Email sent successfully!\n\n📬 To: ${session.to}\n📝 Subject: ${session.subject}`);
+    } catch (err) {
+      console.error('Email error:', err);
+      ctx.reply('❌ Failed to send email. Make sure your App Password is configured correctly in .env');
+    }
+  }
 });
 
 bot.command('search', async (ctx) => {
