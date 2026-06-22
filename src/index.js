@@ -13,9 +13,13 @@ const bot = new Bot(process.env.BOT_TOKEN);
 
 const transporter = nodemailer.createTransport({
   service: 'gmail',
+  secure: true,
   auth: {
     user: process.env.EMAIL_USER,
     pass: process.env.EMAIL_PASS,
+  },
+  tls: {
+    rejectUnauthorized: false,
   },
 });
 
@@ -489,6 +493,12 @@ const server = http.createServer((req, res) => {
 
 async function main() {
   await connectDB();
+  try {
+    await transporter.verify();
+    console.log('✅ SMTP connection verified');
+  } catch (err) {
+    console.error('❌ SMTP verification failed:', err.message);
+  }
   const PORT = process.env.PORT || 3000;
   server.listen(PORT, () => console.log(`🌐 Server listening on port ${PORT}`));
   bot.start();
