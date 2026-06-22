@@ -25,6 +25,15 @@ const transporter = nodemailer.createTransport({
 
 const emailSessions = new Map();
 
+bot.use(async (ctx, next) => {
+  try {
+    await next();
+  } catch (err) {
+    if (err.message && err.message.includes('query is too old')) return;
+    console.error('Handler error:', err);
+  }
+});
+
 const startMenu = new InlineKeyboard()
   .text('📝 Save Note', 'menu_note')
   .text('💡 Save Idea', 'menu_idea')
@@ -247,7 +256,7 @@ bot.command('notes', async (ctx) => {
   const notes = await Note.find({ userId: ctx.from.id }).sort({ createdAt: -1 }).limit(20);
   if (!notes.length) return ctx.reply('No notes yet. Use /note <text> to add one.');
   const list = notes.map((n, i) => `${i + 1}. ${n.content}`).join('\n');
-  ctx.reply(`📝 **Your Notes:**\n\n${list}`, { parse_mode: 'Markdown' });
+  ctx.reply(`📝 Your Notes:\n\n${list}`);
 });
 
 bot.command('delnote', async (ctx) => {
@@ -270,14 +279,14 @@ bot.command('ideas', async (ctx) => {
   const ideas = await Idea.find({ userId: ctx.from.id }).sort({ createdAt: -1 }).limit(20);
   if (!ideas.length) return ctx.reply('No ideas yet. Use /idea <text> to add one.');
   const list = ideas.map((n, i) => `${i + 1}. ${n.content}`).join('\n');
-  ctx.reply(`💡 **Your Ideas:**\n\n${list}`, { parse_mode: 'Markdown' });
+  ctx.reply(`💡 Your Ideas:\n\n${list}`);
 });
 
 bot.command('randomidea', async (ctx) => {
   const ideas = await Idea.find({ userId: ctx.from.id });
   if (!ideas.length) return ctx.reply('No ideas saved yet.');
   const random = ideas[Math.floor(Math.random() * ideas.length)];
-  ctx.reply(`💡 **Random Idea:**\n\n${random.content}`, { parse_mode: 'Markdown' });
+  ctx.reply(`💡 Random Idea:\n\n${random.content}`);
 });
 
 bot.command('remind', async (ctx) => {
@@ -297,7 +306,7 @@ bot.command('reminders', async (ctx) => {
     const time = new Date(r.remindAt).toLocaleString();
     return `${i + 1}. ${r.message} — ${time}`;
   }).join('\n');
-  ctx.reply(`⏰ **Pending Reminders:**\n\n${list}`, { parse_mode: 'Markdown' });
+  ctx.reply(`⏰ Pending Reminders:\n\n${list}`);
 });
 
 bot.command('task', async (ctx) => {
@@ -311,7 +320,7 @@ bot.command('tasks', async (ctx) => {
   const tasks = await Task.find({ userId: ctx.from.id }).sort({ createdAt: -1 }).limit(20);
   if (!tasks.length) return ctx.reply('No tasks yet.');
   const list = tasks.map((t, i) => `${i + 1}. ${t.done ? '✅' : '⬜'} ${t.title}`).join('\n');
-  ctx.reply(`📋 **Your Tasks:**\n\n${list}`, { parse_mode: 'Markdown' });
+  ctx.reply(`📋 Your Tasks:\n\n${list}`);
 });
 
 bot.command('donetask', async (ctx) => {
@@ -391,7 +400,7 @@ bot.command('search', async (ctx) => {
   if (ideas.length) {
     result += `💡 **Ideas:**\n${ideas.map(i => `- ${i.content}`).join('\n')}`;
   }
-  ctx.reply(result, { parse_mode: 'Markdown' });
+  ctx.reply(result);
 });
 
 bot.command('summary', async (ctx) => {
@@ -443,8 +452,7 @@ bot.on('inline_query', async (ctx) => {
       title: `📝 ${n.content.substring(0, 50)}`,
       description: n.content.substring(0, 100),
       input_message_content: {
-        message_text: `📝 **Note:**\n${n.content}`,
-        parse_mode: 'Markdown',
+        message_text: `📝 Note:\n${n.content}`,
       },
     });
   });
@@ -456,8 +464,7 @@ bot.on('inline_query', async (ctx) => {
       title: `💡 ${n.content.substring(0, 50)}`,
       description: n.content.substring(0, 100),
       input_message_content: {
-        message_text: `💡 **Idea:**\n${n.content}`,
-        parse_mode: 'Markdown',
+        message_text: `💡 Idea:\n${n.content}`,
       },
     });
   });
@@ -478,13 +485,16 @@ setInterval(async () => {
   const due = await Reminder.find({ completed: false, remindAt: { $lte: now } });
   for (const r of due) {
     try {
-      await bot.api.sendMessage(r.userId, `⏰ **Reminder:** ${r.message}`, { parse_mode: 'Markdown' });
+      await bot.api.sendMessage(r.userId, `⏰ Reminder: ${r.message}`);
       await Reminder.findByIdAndUpdate(r._id, { completed: true });
     } catch (e) { }
   }
 }, 30000);
 
-bot.catch((err) => console.error('Bot error:', err));
+bot.catch((err) => {
+  if (err.message && err.message.includes('query is too old')) return;
+  console.error('Bot error:', err);
+});
 
 const server = http.createServer((req, res) => {
   res.writeHead(200);
